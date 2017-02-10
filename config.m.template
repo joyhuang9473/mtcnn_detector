@@ -1,0 +1,9 @@
+function [FILE_LIST, DATA_ROOT, LMK_LIST, MULTI_LMK_LIST, LOSS_LIST, ERROR_LIST] = config()
+
+FILE_LIST = './raw_image_list.txt';
+DATA_ROOT = '/workspace/datasets/LFW/data';
+
+LMK_LIST = 'lfw_mtcnn_v2_landmark_list.txt';
+MULTI_LMK_LIST = 'lfw_mtcnn_v2_multi_landmark_list.txt';
+LOSS_LIST = 'lfw_mtcnn_v2_loss_list.txt';
+ERROR_LIST = 'lfw_mtcnn_v2_error_list.txt';
