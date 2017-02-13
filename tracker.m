@@ -1,11 +1,18 @@
 clear;
 
-[FILE_LIST, DATA_ROOT, LMK_LIST, MULTI_LMK_LIST, LOSS_LIST, ERROR_LIST] = config();
+[FILE_LIST, DATA_ROOT, INFO_ROOT, NORMAL_LIST, MULTI_LIST, LOSS_LIST, ERROR_LIST] = config();
 
-flmk = fopen(LMK_LIST, 'w');
-fmulti = fopen(MULTI_LMK_LIST, 'w');
-floss = fopen(LOSS_LIST, 'w');
-ferror = fopen(ERROR_LIST, 'w');
+% log for bbox
+fnormal_bbox = fopen([NORMAL_LIST '.bbox'], 'w');
+fmulti_bbox = fopen([MULTI_LIST '.bbox'], 'w');
+floss_bbox = fopen([LOSS_LIST '.bbox'], 'w');
+ferror_bbox = fopen([ERROR_LIST '.bbox'], 'w');
+
+% log for lmk
+fnormal_lmk = fopen([NORMAL_LIST '.lmk'], 'w');
+fmulti_lmk = fopen([MULTI_LIST '.lmk'], 'w');
+floss_lmk = fopen([LOSS_LIST '.lmk'], 'w');
+ferror_lmk = fopen([ERROR_LIST '.lmk'], 'w');
 
 %list of images
 imglist = importdata(FILE_LIST);
@@ -13,14 +20,20 @@ imglist = importdata(FILE_LIST);
 %path of toolbox
 caffe_path = '/opt/caffe/matlab';
 pdollar_toolbox_path = './dependency/toolbox';
+matlab_json_path = './dependency/matlab-json';
 caffe_model_path = './model';
 
 addpath(genpath(caffe_path));
 addpath(genpath(pdollar_toolbox_path));
+addpath(genpath(matlab_json_path));
 
 gpu_id = 0;
 caffe.set_mode_gpu();
 caffe.set_device(gpu_id);
+
+% load json plugin
+% ref: https://github.com/kyamagu/matlab-json
+json.startup
 
 %three steps's threshold
 threshold = [0.6 0.7 0.7];
@@ -42,80 +55,140 @@ prototxt_dir = strcat(caffe_model_path, '/det4.prototxt');
 model_dir = strcat(caffe_model_path, '/det4.caffemodel');
 LNet = caffe.Net(prototxt_dir, model_dir, 'test');
 
-for i = 1:length(imglist)
-    imgPath = fullfile(DATA_ROOT, imglist{i});
+% create info structure
+info = {};
 
-    if ~exist(imgPath, 'file')
+for i = 1:length(imglist)
+    disp(['process:' num2str(i) '/' num2str(length(imglist))]);
+
+    imgPath = imglist{i};
+    absImgPath = fullfile(DATA_ROOT, imgPath);
+    [identity_name, file_name_part, ext] = fileparts(imgPath);
+
+    % add file_name and identity_name to info
+    info.file_name = [file_name_part ext];
+    info.identity_name = identity_name;
+
+    if ~exist(absImgPath, 'file')
         disp(['file not exist:' imgPath])
-        fprintf(ferror, '%s\n', imgPath);
+        fprintf(ferror_bbox, '%s\n', imgPath);
+        fprintf(ferror_lmk, '%s\n', imgPath);
         continue;
     end
 
     try
-        origin_img = imread(imgPath);
+        origin_img = imread(absImgPath);
+        [height, width, channel] = size(origin_img);
 
-        if size(origin_img, 3) == 3
+        info.width = width;
+        info.height = height;
+        info.channel = channel;
+
+        if channel == 3
             img = origin_img;
-        elseif size(origin_img, 3) == 1
+        elseif channel == 1
             img = origin_img(:,:,[1 1 1]);
         else
             throw(MException('color channels are not valid'));
         end
     catch exception
         disp(['file not valid:' imgPath])
-        fprintf(ferror, '%s\n', imgPath);
+        fprintf(ferror_bbox, '%s\n', imgPath);
+        fprintf(ferror_lmk, '%s\n', imgPath);
         continue;
     end
+
     %we recommend you to set minsize as x * short side
     minl = min([size(img,1) size(img,2)]);
     minsize = fix(minl*0.1);
 
     [bboxes, points] = detect_face(img, minsize, PNet, RNet, ONet, LNet, threshold, false, factor);
 
-    %show detection result
+    %% add bbox to info
     numbox = size(bboxes, 1);
+    info.boundingbox.selected_index = {};
+    info.boundingbox.faces = {};
+    info.boundingbox.nums = numbox;
 
-    if isempty(points)
-        disp(['lmk not detected:' imgPath])
-        fprintf(floss, '%s\n', imgPath);
-        continue;
+    if numbox == 0
+        disp(['bbox not detected:' imgPath])
+        fprintf(floss_bbox, '%s\n', imgPath);
+    elseif numbox == 1
+        info.boundingbox.selected_index = 0;
+        fprintf(fnormal_bbox, '%s\n', imgPath);
+    else
+        disp(['multi-bboxes detected:' imgPath])
+        fprintf(fmulti_bbox, '%s\n', imgPath);
     end
 
-    if numbox > 1
-        for j = 1:numbox
-            disp(['multi face:' imgPath])
-            fprintf(fmulti, '%s', imgPath);
+    for j = 1:numbox
+        x = bboxes(j, 1);
+        y = bboxes(j, 2);
+        width = bboxes(j, 3) - bboxes(j, 1);
+        height = bboxes(j, 4) - bboxes(j, 2);
 
-            for k = 1:5
-                fprintf(fmulti, '\t%.3f\t%.3f', points(k,j), points(k+5,j)); % (x1, y1)
-            end
+        face_index = ['face_' num2str(j-1)];
+        info.boundingbox.faces.(face_index) = struct( ...
+            'x', x, ...
+            'y', y, ...
+            'width', width, ...
+            'height', height);
+    end
 
-            %%TODO: bbox
-            fprintf(fmulti, '\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f', bboxes(j,1), bboxes(j,2), bboxes(j,3), bboxes(j,4), bboxes(j,5));
+    %% add landmark to info
+    numlmk = size(points, 2);
+    info.landmark.selected_index = {};
+    info.landmark.faces = {};
+    info.landmark.nums = numlmk;
 
-            fprintf(fmulti, '\n');
-        end
-    elseif numbox == 1
-        disp(['success:' imgPath])
-        fprintf(flmk, '%s', imgPath);
+    if numlmk == 0
+        disp(['lmk not detected:' imgPath])
+        fprintf(floss_lmk, '%s\n', imgPath);
+    elseif numlmk == 1
+        info.landmark.selected_index = 0;
+        fprintf(fnormal_lmk, '%s\n', imgPath);
+    else
+        disp(['multi-lmks detected:' imgPath])
+        fprintf(fmulti_lmk, '%s\n', imgPath);
+    end
+
+    for j = 1:numlmk
+        lmk_points = {};
 
         for k = 1:5
-            fprintf(flmk, '\t%.3f\t%.3f', points(k,1), points(k+5,1)); % (x1, y1)
+            lmk_points = [lmk_points, points(k, j), points(k+5, j)];
         end
 
-        %%TODO: bbox
-        fprintf(flmk, '\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f', bboxes(1,1), bboxes(1,2), bboxes(1,3), bboxes(1,4), bboxes(1,5));
-
-        fprintf(flmk, '\n');
-    else
-        disp(['something wrong:' imgPath])
-        fprintf(ferror, '%s\n', imgPath);
+        face_index = ['face_' num2str(j-1)];
+        info.landmark.faces.(face_index) = struct( ...
+            'points', {lmk_points}, ...
+            'left_eye_index', 0, ...
+            'right_eye_index', 1, ...
+            'nose_eye_index', 2, ...
+            'left_mouse_index', 3, ...
+            'right_mouse_index', 4);
     end
+
+    % write info to json
+    id_info_root = fullfile(INFO_ROOT, identity_name);
+    if ~exist(id_info_root, 'dir')
+        mkdir(id_info_root);
+    end
+
+    % add pretain column (valid, mean_distance) to info
+    info.valid = 1;
+    info.mean_distance = -1;
+
+    json.write(info, fullfile(id_info_root, [file_name_part ext '.json']));
 
 end
 
-fclose(flmk);
-fclose(fmulti);
-fclose(floss);
-fclose(ferror);
+fclose(fnormal_bbox);
+fclose(fmulti_bbox);
+fclose(floss_bbox);
+fclose(ferror_bbox);
+fclose(fnormal_lmk);
+fclose(fmulti_lmk);
+fclose(floss_lmk);
+fclose(ferror_lmk);
 clear;

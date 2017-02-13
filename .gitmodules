@@ -1,3 +1,6 @@
 [submodule "dependency/toolbox"]
 	path = dependency/toolbox
 	url = https://github.com/pdollar/toolbox.git
+[submodule "dependency/matlab-json"]
+	path = dependency/matlab-json
+	url = https://github.com/kyamagu/matlab-json.git
