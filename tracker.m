@@ -1,5 +1,7 @@
 clear;
 
+setenv('LC_ALL', 'en_US.UTF-8');
+
 [FILE_LIST, DATA_ROOT, INFO_ROOT, NORMAL_LIST, MULTI_LIST, LOSS_LIST, ERROR_LIST] = config();
 
 % log for bbox
