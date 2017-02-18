@@ -1,9 +1,10 @@
-function [FILE_LIST, DATA_ROOT, LMK_LIST, MULTI_LMK_LIST, LOSS_LIST, ERROR_LIST] = config()
+function [FILE_LIST, DATA_ROOT, INFO_ROOT, NORMAL_LIST, MULTI_LIST, LOSS_LIST, ERROR_LIST] = config()
 
 FILE_LIST = './raw_image_list.txt';
 DATA_ROOT = '/workspace/datasets/LFW/data';
+INFO_ROOT = '/workspace/datasets/LFW/intermediate/info';
 
-LMK_LIST = 'lfw_mtcnn_v2_landmark_list.txt';
-MULTI_LMK_LIST = 'lfw_mtcnn_v2_multi_landmark_list.txt';
+NORMAL_LIST = 'lfw_mtcnn_v2_normal_list.txt';
+MULTI_LIST = 'lfw_mtcnn_v2_multi_list.txt';
 LOSS_LIST = 'lfw_mtcnn_v2_loss_list.txt';
 ERROR_LIST = 'lfw_mtcnn_v2_error_list.txt';
