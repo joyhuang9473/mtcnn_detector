@@ -106,7 +106,7 @@ for i = 1:length(imglist)
 
     %% add bbox to info
     numbox = size(bboxes, 1);
-    info.boundingbox.selected_index = {};
+    info.boundingbox.selected_index = '';
     info.boundingbox.faces = {};
     info.boundingbox.nums = numbox;
 
@@ -137,7 +137,7 @@ for i = 1:length(imglist)
 
     %% add landmark to info
     numlmk = size(points, 2);
-    info.landmark.selected_index = {};
+    info.landmark.selected_index = '';
     info.landmark.faces = {};
     info.landmark.nums = numlmk;
 
@@ -176,8 +176,8 @@ for i = 1:length(imglist)
     end
 
     % add pretain column (valid, mean_distance) to info
-    info.valid = 1;
-    info.mean_distance = -1;
+    info.valid = true;
+    info.mean_distance = '';
 
     json.write(info, fullfile(id_info_root, [file_name_part ext '.json']));
 
