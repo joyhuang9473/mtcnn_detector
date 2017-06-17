@@ -78,6 +78,25 @@ for i = 1:length(imglist)
         continue;
     end
 
+    % prevent JPEG library error (8 bit) crash
+    try
+        I = rgb2gray(imread(absImgPath));
+        [w, l] = size(I);
+        gray_percent = sum(sum(I==128))/(w*l);;
+
+        if gray_percent > 0.07
+            disp(['file not valid:' imgPath])
+            fprintf(ferror_bbox, '%s\n', imgPath);
+            fprintf(ferror_lmk, '%s\n', imgPath);
+            continue
+        end
+    catch
+        disp(['file not valid:' imgPath])
+        fprintf(ferror_bbox, '%s\n', imgPath);
+        fprintf(ferror_lmk, '%s\n', imgPath);
+        continue
+    end
+
     try
         origin_img = imread(absImgPath);
         [height, width, channel] = size(origin_img);
